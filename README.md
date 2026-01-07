@@ -1,16 +1,51 @@
-# React + Vite
+# NutriMate AI 
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Emotion-Aware Personalized Diet Recommendation System. A Phase-1 project demo.
 
-Currently, two official plugins are available:
+## Tech Stack
+- **Frontend**: React (Vite)
+- **Backend**: Python (FastAPI)
+- **Styling**: Vanilla CSS (Modern Healthcare Theme)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## How to Run
 
-## React Compiler
+### 1. Frontend Setup
+The frontend runs on port `5173`.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+1. Open a terminal.
+2. Navigate to the project directory:
+   ```bash
+   cd "nutrition project"
+   ```
+3. Install dependencies:
+   ```bash
+   npm install
+   ```
+4. Start the development server:
+   ```bash
+   npm run dev
+   ```
+5. Open [http://localhost:5173](http://localhost:5173) in your browser.
 
-## Expanding the ESLint configuration
+### 2. Backend Setup (Required)
+The backend runs on port `8000` and is required for the application to work.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+1. Open a **new** terminal window.
+2. Navigate to the backend directory:
+   ```bash
+   cd "nutrition project/backend"
+   ```
+3. Install Python dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+4. Start the backend server:
+   ```bash
+   uvicorn main:app --reload --port 8000
+   ```
+5. The API will be available at [http://localhost:8000](http://localhost:8000).
+
+## Usage
+1. Enter how you are feeling (e.g., "I feel stressed and tired").
+2. Enter your age and select a goal.
+3. Click "Get Diet Recommendation" to see the AI-generated diet plan.
