@@ -35,30 +35,20 @@ function App() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to get recommendation. Please try again.');
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to get recommendation.');
       }
 
       const data = await response.json();
       setResult(data);
     } catch (err) {
       console.error(err);
-      setError('Could not connect to the server. Please ensure the backend is running.');
-      // For demo purposes if backend fails, you might want to show mock data?
-      // Uncomment below to mock in dev if backend is offline
-      /*
-      setTimeout(() => {
-        setResult({
-          emotion: "Stressed",
-          diet_plan: {
-            breakfast: "Oatmeal with berries",
-            lunch: "Grilled chicken salad",
-            dinner: "Salmon with quinoa"
-          },
-          notes: "Since you are feeling stressed, we recommend foods high in omega-3 and magnesium."
-        });
-        setError(null);
-      }, 1500);
-      */
+      // Check if it's a fetch error (Network) or a thrown Error from response
+      if (err.message.includes('Failed to fetch')) {
+        setError('Network Error: Could not connect to backend (is it running on port 8000?)');
+      } else {
+        setError(err.message || 'An unexpected error occurred.');
+      }
     } finally {
       setLoading(false);
     }

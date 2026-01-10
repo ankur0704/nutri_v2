@@ -34,7 +34,8 @@ body {
 
 .app-container {
   width: 100%;
-  max-width: 600px;
+  max-width: 1000px;
+  /* Increased from 600px to allow wider layout */
   padding: 2rem;
   margin: 0 auto;
 }
@@ -203,44 +204,48 @@ body {
 
 .meal-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  /* Wider capability for cards */
+  gap: 1.5rem;
   margin-bottom: 2rem;
 }
 
 .meal-card {
   background-color: #fafafa;
-  padding: 1.25rem;
+  padding: 1.5rem;
   border-radius: 12px;
   border: 1px solid #eee;
-  text-align: center;
+  text-align: left;
+  /* Left align for readability */
   transition: transform 0.2s;
-}
-
-.meal-card:hover {
-  transform: translateY(-2px);
-  border-color: var(--primary-color);
+  display: flex;
+  flex-direction: column;
+  items-align: center;
 }
 
 .meal-icon {
-  font-size: 2rem;
-  margin-bottom: 0.75rem;
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
   display: block;
+  text-align: center;
 }
 
 .meal-title {
   font-weight: 600;
-  margin-bottom: 0.4rem;
+  margin-bottom: 0.5rem;
   color: var(--text-secondary);
-  font-size: 0.8rem;
+  font-size: 0.9rem;
+  /* Slightly larger */
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  text-align: center;
 }
 
 .meal-content {
   font-size: 1rem;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--text-main);
+  line-height: 1.6;
 }
 
 .notes-section {
