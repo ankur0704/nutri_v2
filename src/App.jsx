@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import './App.css';
+import Dashboard from './components/Dashboard';
 
 function App() {
+  const [view, setView] = useState('advisor'); // 'advisor' or 'dashboard'
   const [formData, setFormData] = useState({
     text: '',
     age: 25,
@@ -43,7 +45,6 @@ function App() {
       setResult(data);
     } catch (err) {
       console.error(err);
-      // Check if it's a fetch error (Network) or a thrown Error from response
       if (err.message.includes('Failed to fetch')) {
         setError('Network Error: Could not connect to backend (is it running on port 8000?)');
       } else {
@@ -57,125 +58,148 @@ function App() {
   return (
     <div className="app-container">
       <header className="header">
-        <h1 className="title">🥗 NutriMate AI</h1>
+        <div className="header-main">
+          <h1 className="title">🥗 NutriMate AI</h1>
+          <nav className="nav-tabs">
+            <button
+              className={`nav-btn ${view === 'advisor' ? 'active' : ''}`}
+              onClick={() => setView('advisor')}
+            >
+              Meal Advisor
+            </button>
+            <button
+              className={`nav-btn ${view === 'dashboard' ? 'active' : ''}`}
+              onClick={() => setView('dashboard')}
+            >
+              My Analytics
+            </button>
+          </nav>
+        </div>
         <p className="subtitle">Emotion-Aware Personalized Diet Recommendation System</p>
       </header>
 
       <main>
-        <div className="card">
-          <form onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label htmlFor="text" className="form-label">How are you feeling today?</label>
-              <textarea
-                id="text"
-                name="text"
-                className="form-textarea"
-                placeholder="How are you feeling today? (e.g., I feel stressed and tired)"
-                value={formData.text}
-                onChange={handleChange}
-                required
-              />
-            </div>
-
-            <div className="form-row">
-              <div className="form-col">
+        {view === 'advisor' ? (
+          <div className="view-fade-in">
+            <div className="card">
+              <form onSubmit={handleSubmit}>
                 <div className="form-group">
-                  <label htmlFor="age" className="form-label">Age</label>
-                  <input
-                    type="number"
-                    id="age"
-                    name="age"
-                    className="form-input"
-                    value={formData.age}
+                  <label htmlFor="text" className="form-label">How are you feeling today?</label>
+                  <textarea
+                    id="text"
+                    name="text"
+                    className="form-textarea"
+                    placeholder="Describe your current state... (e.g., I feel stressed and have a lot of work)"
+                    value={formData.text}
                     onChange={handleChange}
-                    min="1"
-                    max="120"
                     required
                   />
                 </div>
-              </div>
-              <div className="form-col">
-                <div className="form-group">
-                  <label htmlFor="goal" className="form-label">Goal</label>
-                  <select
-                    id="goal"
-                    name="goal"
-                    className="form-select"
-                    value={formData.goal}
-                    onChange={handleChange}
-                  >
-                    <option value="Maintain Weight">Maintain Weight</option>
-                    <option value="Weight Loss">Weight Loss</option>
-                    <option value="Weight Gain">Weight Gain</option>
-                  </select>
+
+                <div className="form-row">
+                  <div className="form-col">
+                    <div className="form-group">
+                      <label htmlFor="age" className="form-label">Age</label>
+                      <input
+                        type="number"
+                        id="age"
+                        name="age"
+                        className="form-input"
+                        value={formData.age}
+                        onChange={handleChange}
+                        min="1"
+                        max="120"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="form-col">
+                    <div className="form-group">
+                      <label htmlFor="goal" className="form-label">Goal</label>
+                      <select
+                        id="goal"
+                        name="goal"
+                        className="form-select"
+                        value={formData.goal}
+                        onChange={handleChange}
+                      >
+                        <option value="Maintain Weight">Maintain Weight</option>
+                        <option value="Weight Loss">Weight Loss</option>
+                        <option value="Weight Gain">Weight Gain</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
-              </div>
+
+                <button type="submit" className="btn-primary" disabled={loading}>
+                  {loading ? 'Analyzing...' : 'Get Diet Recommendation'}
+                </button>
+              </form>
             </div>
 
-            <button type="submit" className="btn-primary" disabled={loading}>
-              {loading ? 'Analyzing...' : 'Get Diet Recommendation'}
-            </button>
-          </form>
-        </div>
+            {loading && (
+              <div className="loading-container">
+                <div className="spinner"></div>
+                <p className="loading-text">Analyzing your emotion...</p>
+              </div>
+            )}
 
-        {loading && (
-          <div className="loading-container">
-            <div className="spinner"></div>
-            <p className="loading-text">Analyzing your emotion...</p>
-          </div>
-        )}
+            {error && (
+              <div className="card error-card">
+                {error}
+              </div>
+            )}
 
-        {error && (
-          <div className="card" style={{ borderLeft: '4px solid #f44336', color: '#f44336' }}>
-            {error}
-          </div>
-        )}
-
-        {result && (
-          <div className="card result-card">
-            <div className="result-header">
-              <h2 className="section-title">Analysis Result</h2>
-              {result.emotion && (
-                <div className="emotion-badge">
-                  <span>Detected Emotion:</span>
-                  <strong>{result.emotion}</strong>
+            {result && (
+              <div className="card result-card">
+                <div className="result-header">
+                  <h2 className="section-title">Analysis Result</h2>
+                  {result.emotion && (
+                    <div className="emotion-badge">
+                      <span>Detected Emotion:</span>
+                      <strong>{result.emotion}</strong>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
 
-            <div className="meal-grid">
-              <div className="meal-card">
-                <span className="meal-icon">🍳</span>
-                <div className="meal-title">Breakfast</div>
-                <div className="meal-content">{result.diet_plan?.breakfast || 'N/A'}</div>
-              </div>
-              <div className="meal-card">
-                <span className="meal-icon">🥗</span>
-                <div className="meal-title">Lunch</div>
-                <div className="meal-content">{result.diet_plan?.lunch || 'N/A'}</div>
-              </div>
-              <div className="meal-card">
-                <span className="meal-icon">🍽️</span>
-                <div className="meal-title">Dinner</div>
-                <div className="meal-content">{result.diet_plan?.dinner || 'N/A'}</div>
-              </div>
-            </div>
+                <div className="meal-grid">
+                  <div className="meal-card">
+                    <span className="meal-icon">🍳</span>
+                    <div className="meal-title">Breakfast</div>
+                    <div className="meal-content">{result.diet_plan?.breakfast || 'N/A'}</div>
+                  </div>
+                  <div className="meal-card">
+                    <span className="meal-icon">🥗</span>
+                    <div className="meal-title">Lunch</div>
+                    <div className="meal-content">{result.diet_plan?.lunch || 'N/A'}</div>
+                  </div>
+                  <div className="meal-card">
+                    <span className="meal-icon">🍽️</span>
+                    <div className="meal-title">Dinner</div>
+                    <div className="meal-content">{result.diet_plan?.dinner || 'N/A'}</div>
+                  </div>
+                </div>
 
-            {result.notes && (
-              <div className="notes-section">
-                <div className="notes-title">💡 Why this recommendation?</div>
-                <p>{result.notes}</p>
+                {result.notes && (
+                  <div className="notes-section">
+                    <div className="notes-title">💡 Why this recommendation?</div>
+                    <p>{result.notes}</p>
+                  </div>
+                )}
               </div>
             )}
           </div>
+        ) : (
+          <Dashboard />
         )}
       </main>
 
       <footer className="footer">
-        <p>NutriMate AI – Phase 1 Prototype | Final Year Engineering Project</p>
+        <p>NutriMate AI – Phase 2 Analytics | Advanced Engineering Project</p>
       </footer>
     </div>
   );
 }
 
 export default App;
+
