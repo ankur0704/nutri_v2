@@ -1,130 +1,219 @@
 import React from 'react';
-import { 
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  BarChart, Bar, Cell, Legend 
+import {
+    LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+    BarChart, Bar, Cell, Legend
 } from 'recharts';
-import { Brain, Activity, TrendingUp, Lightbulb } from 'lucide-react';
+import { Brain, Activity, TrendingUp, Lightbulb, FileText, Download } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const moodData = [
-  { day: 'Mon', mood: 4, focus: 3 },
-  { day: 'Tue', mood: 3, focus: 4 },
-  { day: 'Wed', mood: 2, focus: 2 },
-  { day: 'Thu', mood: 5, focus: 5 },
-  { day: 'Fri', mood: 4, focus: 4 },
-  { day: 'Sat', mood: 5, focus: 4 },
-  { day: 'Sun', mood: 3, focus: 3 },
+    { day: 'Mon', mood: 4, focus: 3, energy: 4 },
+    { day: 'Tue', mood: 3, focus: 4, energy: 3 },
+    { day: 'Wed', mood: 2, focus: 2, energy: 2 },
+    { day: 'Thu', mood: 5, focus: 5, energy: 5 },
+    { day: 'Fri', mood: 4, focus: 4, energy: 4 },
+    { day: 'Sat', mood: 5, focus: 4, energy: 5 },
+    { day: 'Sun', mood: 3, focus: 3, energy: 3 },
 ];
 
 const nutrientData = [
-  { name: 'Protein', impact: 85, color: '#4CAF50' },
-  { name: 'Fiber', impact: 70, color: '#8BC34A' },
-  { name: 'Omega-3', impact: 95, color: '#2E7D32' },
-  { name: 'Magnesium', impact: 60, color: '#A5D6A7' },
-  { name: 'Sugar', impact: -40, color: '#FF5252' },
+    { name: 'Protein', impact: 85, color: '#4CAF50' },
+    { name: 'Fiber', impact: 70, color: '#8BC34A' },
+    { name: 'Omega-3', impact: 95, color: '#2E7D32' },
+    { name: 'Magnesium', impact: 60, color: '#A5D6A7' },
+    { name: 'Sugar', impact: -40, color: '#FF5252' },
 ];
 
 const Dashboard = () => {
-  return (
-    <div className="dashboard-fade-in">
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-icon-wrapper mood">
-            <Brain size={24} />
-          </div>
-          <div className="stat-info">
-            <span className="stat-label">Weekly Mood Avg</span>
-            <span className="stat-value">Good (4.2/5)</span>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon-wrapper focus">
-            <Activity size={24} />
-          </div>
-          <div className="stat-info">
-            <span className="stat-label">Cognitive Clarity</span>
-            <span className="stat-value">High (+15%)</span>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon-wrapper trend">
-            <TrendingUp size={24} />
-          </div>
-          <div className="stat-info">
-            <span className="stat-label">Best performing food</span>
-            <span className="stat-value">Salmon & Walnuts</span>
-          </div>
-        </div>
-      </div>
+    const exportPDF = () => {
+        try {
+            const doc = new jsPDF();
 
-      <div className="charts-container">
-        <div className="chart-wrapper">
-          <h3 className="chart-title">Mood & Focus Trends</h3>
-          <div style={{ width: '100%', height: 300 }}>
-            <ResponsiveContainer>
-              <LineChart data={moodData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
-                <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fill: '#666'}} />
-                <YAxis hide />
-                <Tooltip 
-                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                />
-                <Legend iconType="circle" />
-                <Line 
-                  type="monotone" 
-                  dataKey="mood" 
-                  stroke="#4CAF50" 
-                  strokeWidth={3} 
-                  dot={{ r: 4, fill: '#4CAF50' }}
-                  activeDot={{ r: 6 }}
-                  name="Mood Level"
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="focus" 
-                  stroke="#2196F3" 
-                  strokeWidth={3} 
-                  dot={{ r: 4, fill: '#2196F3' }}
-                  name="Focus Level"
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+            // Add Header
+            doc.setFontSize(22);
+            doc.setTextColor(46, 125, 50); // Primary green
+            doc.text('NutriMate AI', 105, 20, { align: 'center' });
 
-        <div className="chart-wrapper">
-          <h3 className="chart-title">Nutrient-Mood Correlation</h3>
-          <div style={{ width: '100%', height: 300 }}>
-            <ResponsiveContainer>
-              <BarChart data={nutrientData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#eee" />
-                <XAxis type="number" hide />
-                <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} width={80} />
-                <Tooltip 
-                  cursor={{fill: 'transparent'}}
-                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                />
-                <Bar dataKey="impact" radius={[0, 4, 4, 0]} name="Impact Score %">
-                  {nutrientData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
+            doc.setFontSize(16);
+            doc.setTextColor(44, 62, 80);
+            doc.text('Clinical Health & Nutrition Report', 105, 30, { align: 'center' });
 
-      <div className="ai-insight-card">
-        <div className="insight-header">
-          <Lightbulb className="insight-icon" />
-          <h4>AI Personalized Insight</h4>
+            doc.setFontSize(10);
+            doc.setTextColor(100, 100, 100);
+            doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 105, 38, { align: 'center' });
+
+            doc.setDrawColor(200, 200, 200);
+            doc.line(20, 45, 190, 45);
+
+            // 1. Patient Summary Section
+            doc.setFontSize(14);
+            doc.setTextColor(46, 125, 50);
+            doc.text('I. Patient Bio-Summary', 20, 55);
+
+            doc.setFontSize(11);
+            doc.setTextColor(0, 0, 0);
+            doc.text('Weekly Assessment Level:', 20, 65);
+            doc.text('Optimal Performance (Score: 4.2/5.0)', 80, 65);
+
+            doc.text('Primary Goal:', 20, 72);
+            doc.text('Metabolic Maintenance & Cognitive Support', 80, 72);
+
+            // 2. Weekly Data Table
+            doc.setFontSize(14);
+            doc.setTextColor(46, 125, 50);
+            doc.text('II. Weekly Wellness Tracking', 20, 85);
+
+            const tableRows = moodData.map(item => [
+                item.day,
+                item.mood + '/5',
+                item.focus + '/5',
+                item.energy + '/5'
+            ]);
+
+            autoTable(doc, {
+                startY: 90,
+                head: [['Day', 'Mood Level', 'Focus Level', 'Energy Level']],
+                body: tableRows,
+                theme: 'grid',
+                headStyles: { fillStyle: [76, 175, 80], textColor: [255, 255, 255] }
+            });
+
+            // 3. AI Analysis Section
+            const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 15 : 150;
+            doc.setFontSize(14);
+            doc.setTextColor(46, 125, 50);
+            doc.text('III. AI Clinical Pattern Detection', 20, finalY);
+
+            doc.setFontSize(10);
+            doc.setTextColor(50, 50, 50);
+            const insightText =
+                "Based on analysis of 7 days of longitudinal data, the NutriMate AI system has identified a high-confidence correlation (0.85) between high-omega-3 intake and evening cognitive focus. A recurring 'Sugar Crash' pattern was detected on Wednesdays, following high glycemic-index meals. Clinical recommendation is to substitute mid-day simple carbohydrates with complex fibers and healthy fats to stabilize cortisol and glucose levels.";
+
+            const splitText = doc.splitTextToSize(insightText, 170);
+            doc.text(splitText, 20, finalY + 10);
+
+            // Footer
+            doc.setFontSize(9);
+            doc.setTextColor(150, 150, 150);
+            doc.text('Confidential Health Data | Generated by NutriMate AI System', 105, 285, { align: 'center' });
+
+            doc.save('NutriMate_Clinical_Report.pdf');
+        } catch (err) {
+            console.error("PDF Generation Error:", err);
+            alert("Error generating PDF: " + err.message);
+        }
+    };
+
+    return (
+        <div className="dashboard-fade-in">
+            <div className="dashboard-header-row">
+                <h2 className="dashboard-main-title">Wellness Dashboard</h2>
+                <button className="btn-export" onClick={exportPDF}>
+                    <Download size={18} />
+                    Export Clinical Report
+                </button>
+            </div>
+
+            <div className="stats-grid">
+                <div className="stat-card">
+                    <div className="stat-icon-wrapper mood">
+                        <Brain size={24} />
+                    </div>
+                    <div className="stat-info">
+                        <span className="stat-label">Weekly Mood Avg</span>
+                        <span className="stat-value">Good (4.2/5)</span>
+                    </div>
+                </div>
+                <div className="stat-card">
+                    <div className="stat-icon-wrapper focus">
+                        <Activity size={24} />
+                    </div>
+                    <div className="stat-info">
+                        <span className="stat-label">Cognitive Clarity</span>
+                        <span className="stat-value">High (+15%)</span>
+                    </div>
+                </div>
+                <div className="stat-card">
+                    <div className="stat-icon-wrapper trend">
+                        <TrendingUp size={24} />
+                    </div>
+                    <div className="stat-info">
+                        <span className="stat-label">Best performing food</span>
+                        <span className="stat-value">Salmon & Walnuts</span>
+                    </div>
+                </div>
+            </div>
+
+            <div className="charts-container">
+                <div className="chart-wrapper">
+                    <h3 className="chart-title">Mood & Focus Trends</h3>
+                    <div style={{ width: '100%', height: 300 }}>
+                        <ResponsiveContainer>
+                            <LineChart data={moodData}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
+                                <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: '#666' }} />
+                                <YAxis hide />
+                                <Tooltip
+                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                                />
+                                <Legend iconType="circle" />
+                                <Line
+                                    type="monotone"
+                                    dataKey="mood"
+                                    stroke="#4CAF50"
+                                    strokeWidth={3}
+                                    dot={{ r: 4, fill: '#4CAF50' }}
+                                    activeDot={{ r: 6 }}
+                                    name="Mood Level"
+                                />
+                                <Line
+                                    type="monotone"
+                                    dataKey="focus"
+                                    stroke="#2196F3"
+                                    strokeWidth={3}
+                                    dot={{ r: 4, fill: '#2196F3' }}
+                                    name="Focus Level"
+                                />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                <div className="chart-wrapper">
+                    <h3 className="chart-title">Nutrient-Mood Correlation</h3>
+                    <div style={{ width: '100%', height: 300 }}>
+                        <ResponsiveContainer>
+                            <BarChart data={nutrientData} layout="vertical">
+                                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#eee" />
+                                <XAxis type="number" hide />
+                                <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} width={80} />
+                                <Tooltip
+                                    cursor={{ fill: 'transparent' }}
+                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                                />
+                                <Bar dataKey="impact" radius={[0, 4, 4, 0]} name="Impact Score %">
+                                    {nutrientData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+            </div>
+
+            <div className="ai-insight-card">
+                <div className="insight-header">
+                    <Lightbulb className="insight-icon" />
+                    <h4>AI Personalized Insight</h4>
+                </div>
+                <p className="insight-text">
+                    Based on your last 7 days, we found a strong positive correlation (0.85) between <strong>Omega-3</strong> intake and <strong>afternoon focus levels</strong>. Conversely, <strong>high sugar lunches</strong> on Wednesday were followed by a 40% drop in mood scores by 4 PM. We recommend shifting sugar-heavy snacks to natural fiber-rich fruits.
+                </p>
+            </div>
         </div>
-        <p className="insight-text">
-          Based on your last 7 days, we found a strong positive correlation (0.85) between <strong>Omega-3</strong> intake and <strong>afternoon focus levels</strong>. Conversely, <strong>high sugar lunches</strong> on Wednesday were followed by a 40% drop in mood scores by 4 PM. We recommend shifting sugar-heavy snacks to natural fiber-rich fruits.
-        </p>
-      </div>
-    </div>
-  );
+    );
 };
 
 export default Dashboard;
