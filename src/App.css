@@ -553,3 +553,147 @@ body {
     padding: 1.5rem;
   }
 }
+
+/* Dashboard Layout */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 350px;
+  gap: 2rem;
+}
+
+.dashboard-main {
+  min-width: 0;
+}
+
+.dashboard-sidebar {
+  min-width: 0;
+}
+
+.dashboard-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.btn-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  border: 1px solid #ddd;
+  background: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.btn-icon:hover {
+  background: #f5f5f5;
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.mock-badge {
+  font-size: 0.7rem;
+  background: #FFF3E0;
+  color: #E65100;
+  padding: 0.2rem 0.6rem;
+  border-radius: 20px;
+  margin-left: 0.8rem;
+  font-weight: 500;
+}
+
+/* Mood Logger */
+.mood-logger {
+  position: sticky;
+  top: 2rem;
+}
+
+.logger-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+  color: var(--text-main);
+}
+
+.score-selector {
+  margin-bottom: 1.2rem;
+}
+
+.score-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.score-buttons {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.score-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 2px solid #e0e0e0;
+  background: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.score-btn:hover {
+  border-color: var(--active-color, #4CAF50);
+  background: #f9f9f9;
+}
+
+.score-btn.active {
+  background: var(--active-color, #4CAF50);
+  border-color: var(--active-color, #4CAF50);
+  color: white;
+}
+
+.success-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #E8F5E9;
+  color: #2E7D32;
+  padding: 0.8rem 1rem;
+  border-radius: 10px;
+  margin-bottom: 1rem;
+  font-weight: 500;
+}
+
+.error-banner {
+  background: #FFEBEE;
+  color: #C62828;
+  padding: 0.8rem 1rem;
+  border-radius: 10px;
+  margin-bottom: 1rem;
+}
+
+.btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+@media (max-width: 900px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-sidebar {
+    order: -1;
+  }
+
+  .mood-logger {
+    position: static;
+  }
+}
