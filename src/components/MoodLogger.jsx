@@ -40,7 +40,6 @@ const MoodLogger = ({ onEntryLogged }) => {
                 notes: ''
             });
 
-            // Refresh dashboard data
             console.log('Entry logged, refreshing dashboard...');
             if (onEntryLogged) {
                 await onEntryLogged();
@@ -55,19 +54,21 @@ const MoodLogger = ({ onEntryLogged }) => {
         }
     };
 
-    const ScoreSelector = ({ label, icon: Icon, value, onChange, color }) => (
-        <div className="score-selector">
-            <div className="score-label">
-                <Icon size={18} style={{ color }} />
-                <span>{label}</span>
+    const ScoreSelector = ({ label, icon: Icon, value, onChange, color, bgColor }) => (
+        <div className="mb-5">
+            <div className="flex items-center gap-2 mb-2">
+                <Icon size={18} className={color} />
+                <span className="font-medium text-gray-700">{label}</span>
             </div>
-            <div className="score-buttons">
+            <div className="flex gap-2">
                 {[1, 2, 3, 4, 5].map(score => (
                     <button
                         key={score}
                         type="button"
-                        className={`score-btn ${value === score ? 'active' : ''}`}
-                        style={{ '--active-color': color }}
+                        className={`w-10 h-10 rounded-lg font-semibold transition-all duration-200 ${value === score
+                                ? `${bgColor} text-white shadow-md scale-105`
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
                         onClick={() => onChange(score)}
                     >
                         {score}
@@ -78,18 +79,22 @@ const MoodLogger = ({ onEntryLogged }) => {
     );
 
     return (
-        <div className="mood-logger card">
-            <h3 className="logger-title">📝 Log Today's Wellness</h3>
+        <div className="bg-white rounded-xl shadow-sm p-6">
+            <h3 className="text-lg font-bold text-gray-800 mb-5 flex items-center gap-2">
+                📝 Log Today's Wellness
+            </h3>
 
             {success && (
-                <div className="success-banner">
+                <div className="flex items-center gap-2 px-4 py-3 bg-green-100 text-green-700 rounded-lg mb-4 animate-fadeIn">
                     <CheckCircle size={18} />
                     Entry logged successfully!
                 </div>
             )}
 
             {error && (
-                <div className="error-banner">{error}</div>
+                <div className="px-4 py-3 bg-red-100 text-red-700 rounded-lg mb-4">
+                    {error}
+                </div>
             )}
 
             <form onSubmit={handleSubmit}>
@@ -98,7 +103,8 @@ const MoodLogger = ({ onEntryLogged }) => {
                     icon={Smile}
                     value={formData.mood_score}
                     onChange={(val) => setFormData(p => ({ ...p, mood_score: val }))}
-                    color="#4CAF50"
+                    color="text-green-500"
+                    bgColor="bg-green-500"
                 />
 
                 <ScoreSelector
@@ -106,7 +112,8 @@ const MoodLogger = ({ onEntryLogged }) => {
                     icon={Zap}
                     value={formData.energy_level}
                     onChange={(val) => setFormData(p => ({ ...p, energy_level: val }))}
-                    color="#FF9800"
+                    color="text-orange-500"
+                    bgColor="bg-orange-500"
                 />
 
                 <ScoreSelector
@@ -114,15 +121,17 @@ const MoodLogger = ({ onEntryLogged }) => {
                     icon={Brain}
                     value={formData.focus_level}
                     onChange={(val) => setFormData(p => ({ ...p, focus_level: val }))}
-                    color="#2196F3"
+                    color="text-blue-500"
+                    bgColor="bg-blue-500"
                 />
 
-                <div className="form-group">
-                    <label className="form-label">
-                        <Utensils size={16} /> What did you eat today?
+                <div className="mb-4">
+                    <label className="flex items-center gap-2 font-medium text-gray-700 mb-2">
+                        <Utensils size={16} className="text-gray-500" />
+                        What did you eat today?
                     </label>
                     <textarea
-                        className="form-textarea"
+                        className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all resize-none text-sm"
                         placeholder="e.g., Oatmeal for breakfast, salad for lunch..."
                         value={formData.food_eaten}
                         onChange={(e) => setFormData(p => ({ ...p, food_eaten: e.target.value }))}
@@ -130,18 +139,22 @@ const MoodLogger = ({ onEntryLogged }) => {
                     />
                 </div>
 
-                <div className="form-group">
-                    <label className="form-label">Notes (optional)</label>
+                <div className="mb-5">
+                    <label className="block font-medium text-gray-700 mb-2">Notes (optional)</label>
                     <input
                         type="text"
-                        className="form-input"
+                        className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all text-sm"
                         placeholder="Any additional notes..."
                         value={formData.notes}
                         onChange={(e) => setFormData(p => ({ ...p, notes: e.target.value }))}
                     />
                 </div>
 
-                <button type="submit" className="btn-primary" disabled={loading}>
+                <button
+                    type="submit"
+                    className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-green-500 to-green-600 text-white font-semibold rounded-lg shadow-md hover:shadow-lg hover:from-green-600 hover:to-green-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={loading}
+                >
                     <Save size={18} />
                     {loading ? 'Saving...' : 'Log Entry'}
                 </button>

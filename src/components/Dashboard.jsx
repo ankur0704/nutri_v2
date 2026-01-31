@@ -67,7 +67,6 @@ const Dashboard = () => {
             setUsingMockData(true);
         }
 
-        // Fetch analytics separately - don't let it affect mood data
         try {
             const analyticsResponse = await fetch('http://localhost:8000/analytics');
             if (analyticsResponse.ok) {
@@ -77,7 +76,6 @@ const Dashboard = () => {
             }
         } catch (analyticsErr) {
             console.error('Failed to fetch analytics:', analyticsErr);
-            // Don't reset mood data on analytics failure
         }
 
         setLoading(false);
@@ -101,52 +99,50 @@ const Dashboard = () => {
 
             doc.setFontSize(10);
             doc.setTextColor(100, 100, 100);
-            doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 105, 38, { align: 'center' });
+            const date = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            doc.text(`Report Generated: ${date}`, 105, 40, { align: 'center' });
 
-            doc.setDrawColor(200, 200, 200);
+            doc.setDrawColor(76, 175, 80);
+            doc.setLineWidth(0.5);
             doc.line(20, 45, 190, 45);
 
             doc.setFontSize(14);
             doc.setTextColor(46, 125, 50);
-            doc.text('I. Patient Bio-Summary', 20, 55);
-
-            doc.setFontSize(11);
-            doc.setTextColor(0, 0, 0);
-
-            const avgMood = analytics?.averages?.mood || (moodData.reduce((a, b) => a + b.mood, 0) / moodData.length).toFixed(1);
-            doc.text('Weekly Assessment Level:', 20, 65);
-            doc.text(`Score: ${avgMood}/5.0`, 80, 65);
-
-            doc.text('Primary Goal:', 20, 72);
-            doc.text('Metabolic Maintenance & Cognitive Support', 80, 72);
-
-            doc.setFontSize(14);
-            doc.setTextColor(46, 125, 50);
-            doc.text('II. Weekly Wellness Tracking', 20, 85);
-
-            const tableRows = moodData.map(item => [
-                item.day,
-                item.mood + '/5',
-                item.focus + '/5',
-                item.energy + '/5'
-            ]);
+            doc.text('1. Weekly Wellness Summary', 20, 55);
 
             autoTable(doc, {
-                startY: 90,
-                head: [['Day', 'Mood Level', 'Focus Level', 'Energy Level']],
-                body: tableRows,
-                theme: 'grid',
-                headStyles: { fillColor: [76, 175, 80], textColor: [255, 255, 255] }
+                startY: 60,
+                head: [['Day', 'Mood (1-5)', 'Focus (1-5)', 'Energy (1-5)']],
+                body: moodData.map(d => [d.day, d.mood, d.focus, d.energy]),
+                theme: 'striped',
+                headStyles: { fillColor: [76, 175, 80], textColor: 255 },
+                styles: { halign: 'center' },
             });
 
-            const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 15 : 150;
+            let finalY = doc.lastAutoTable.finalY + 10;
+
             doc.setFontSize(14);
             doc.setTextColor(46, 125, 50);
-            doc.text('III. AI Clinical Insights', 20, finalY);
+            doc.text('2. Nutrient Impact on Mental Wellness', 20, finalY);
 
-            doc.setFontSize(10);
+            autoTable(doc, {
+                startY: finalY + 5,
+                head: [['Nutrient', 'Mood Impact Score']],
+                body: nutrientData.map(n => [n.name, `${n.impact > 0 ? '+' : ''}${n.impact}%`]),
+                theme: 'grid',
+                headStyles: { fillColor: [76, 175, 80] },
+                styles: { halign: 'center' },
+            });
+
+            finalY = doc.lastAutoTable.finalY + 10;
+
+            doc.setFontSize(14);
+            doc.setTextColor(46, 125, 50);
+            doc.text('3. AI-Generated Insights', 20, finalY);
+
+            doc.setFontSize(11);
             doc.setTextColor(50, 50, 50);
-            const insightText = "Based on longitudinal analysis, the NutriMate AI system identified correlations between omega-3 intake and cognitive focus. Clinical recommendation: prioritize complex carbohydrates and healthy fats.";
+            const insightText = "Based on your recent data, Omega-3 rich foods correlate with higher focus scores, while high sugar intake shows a negative impact on afternoon energy levels. Consider reducing refined sugars and increasing whole foods for improved mental clarity.";
             const splitText = doc.splitTextToSize(insightText, 170);
             doc.text(splitText, 20, finalY + 10);
 
@@ -162,65 +158,81 @@ const Dashboard = () => {
     };
 
     return (
-        <div className="dashboard-fade-in">
-            <div className="dashboard-header-row">
-                <h2 className="dashboard-main-title">
+        <div className="animate-fadeIn">
+            {/* Header Row */}
+            <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
+                <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
                     Wellness Dashboard
-                    {usingMockData && <span className="mock-badge">Demo Data</span>}
+                    {usingMockData && (
+                        <span className="text-xs px-3 py-1 bg-amber-100 text-amber-700 rounded-full font-medium">
+                            Demo Data
+                        </span>
+                    )}
                 </h2>
-                <div className="dashboard-actions">
-                    <button className="btn-icon" onClick={fetchHistory} title="Refresh">
-                        <RefreshCw size={18} />
+                <div className="flex items-center gap-3">
+                    <button
+                        className="p-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                        onClick={fetchHistory}
+                        title="Refresh"
+                    >
+                        <RefreshCw size={18} className="text-gray-600" />
                     </button>
-                    <button className="btn-export" onClick={exportPDF}>
+                    <button
+                        className="flex items-center gap-2 px-4 py-2 bg-white border border-green-500 text-green-600 rounded-xl font-semibold hover:bg-green-500 hover:text-white transition-all duration-300"
+                        onClick={exportPDF}
+                    >
                         <Download size={18} />
                         Export Report
                     </button>
                 </div>
             </div>
 
-            <div className="dashboard-grid">
-                <div className="dashboard-main">
-                    <div className="stats-grid">
-                        <div className="stat-card">
-                            <div className="stat-icon-wrapper mood">
-                                <Brain size={24} />
+            {/* Main Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Left Column - Charts */}
+                <div className="lg:col-span-2 space-y-6">
+                    {/* Stats Cards */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="bg-white rounded-xl p-5 shadow-sm flex items-center gap-4">
+                            <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                                <Brain className="text-green-600" size={24} />
                             </div>
-                            <div className="stat-info">
-                                <span className="stat-label">Weekly Mood Avg</span>
-                                <span className="stat-value">
+                            <div>
+                                <span className="text-sm text-gray-500 block">Weekly Mood Avg</span>
+                                <span className="text-xl font-bold text-gray-800">
                                     {analytics?.averages?.mood || '4.2'}/5
                                 </span>
                             </div>
                         </div>
-                        <div className="stat-card">
-                            <div className="stat-icon-wrapper focus">
-                                <Activity size={24} />
+                        <div className="bg-white rounded-xl p-5 shadow-sm flex items-center gap-4">
+                            <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                                <Activity className="text-blue-600" size={24} />
                             </div>
-                            <div className="stat-info">
-                                <span className="stat-label">Focus Level</span>
-                                <span className="stat-value">
+                            <div>
+                                <span className="text-sm text-gray-500 block">Focus Level</span>
+                                <span className="text-xl font-bold text-gray-800">
                                     {analytics?.averages?.focus || '3.5'}/5
                                 </span>
                             </div>
                         </div>
-                        <div className="stat-card">
-                            <div className="stat-icon-wrapper trend">
-                                <TrendingUp size={24} />
+                        <div className="bg-white rounded-xl p-5 shadow-sm flex items-center gap-4">
+                            <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center">
+                                <TrendingUp className="text-orange-600" size={24} />
                             </div>
-                            <div className="stat-info">
-                                <span className="stat-label">Total Entries</span>
-                                <span className="stat-value">
+                            <div>
+                                <span className="text-sm text-gray-500 block">Total Entries</span>
+                                <span className="text-xl font-bold text-gray-800">
                                     {analytics?.total_entries || moodData.length}
                                 </span>
                             </div>
                         </div>
                     </div>
 
-                    <div className="charts-container">
-                        <div className="chart-wrapper">
-                            <h3 className="chart-title">Mood & Focus Trends</h3>
-                            <div style={{ width: '100%', height: 280 }}>
+                    {/* Charts */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="bg-white rounded-xl p-6 shadow-sm">
+                            <h3 className="text-lg font-semibold text-gray-800 mb-4">Mood & Focus Trends</h3>
+                            <div className="h-64">
                                 <ResponsiveContainer>
                                     <LineChart data={moodData}>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
@@ -236,9 +248,9 @@ const Dashboard = () => {
                             </div>
                         </div>
 
-                        <div className="chart-wrapper">
-                            <h3 className="chart-title">Nutrient Impact Analysis</h3>
-                            <div style={{ width: '100%', height: 280 }}>
+                        <div className="bg-white rounded-xl p-6 shadow-sm">
+                            <h3 className="text-lg font-semibold text-gray-800 mb-4">Nutrient Impact Analysis</h3>
+                            <div className="h-64">
                                 <ResponsiveContainer>
                                     <BarChart data={nutrientData} layout="vertical">
                                         <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#eee" />
@@ -256,19 +268,22 @@ const Dashboard = () => {
                         </div>
                     </div>
 
-                    <div className="ai-insight-card">
-                        <div className="insight-header">
-                            <Lightbulb className="insight-icon" />
-                            <h4>AI Personalized Insight</h4>
+                    {/* AI Insight */}
+                    <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-100 rounded-xl p-6">
+                        <div className="flex items-center gap-3 mb-3">
+                            <Lightbulb className="text-green-600" size={24} />
+                            <h4 className="font-semibold text-gray-800">AI Personalized Insight</h4>
                         </div>
-                        <p className="insight-text">
+                        <p className="text-gray-600 leading-relaxed">
                             Based on your recent data, we've identified patterns between your nutrition and mental wellness.
-                            <strong> Omega-3 rich foods</strong> correlate with higher focus scores, while <strong>high sugar intake</strong> shows a negative impact on afternoon energy levels.
+                            <strong className="text-green-700"> Omega-3 rich foods</strong> correlate with higher focus scores, while
+                            <strong className="text-red-600"> high sugar intake</strong> shows a negative impact on afternoon energy levels.
                         </p>
                     </div>
                 </div>
 
-                <div className="dashboard-sidebar">
+                {/* Right Column - Mood Logger */}
+                <div className="lg:col-span-1">
                     <MoodLogger onEntryLogged={fetchHistory} />
                 </div>
             </div>
@@ -277,4 +292,3 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
-
