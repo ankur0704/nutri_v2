@@ -121,3 +121,11 @@ __pycache__/
 venv/
 .venv/
 backend/.env
+
+# ML Training - Large Files
+ml/data/
+ml/emotion_model/
+*.pt
+*.bin
+*.safetensors
+*.onnx
