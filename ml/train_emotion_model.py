@@ -5,12 +5,12 @@ Optimized for GTX 1050 (4GB VRAM) with gradient accumulation.
 
 import os
 import torch
+from torch.optim import AdamW
 import pandas as pd
 from torch.utils.data import Dataset, DataLoader
 from transformers import (
     DistilBertTokenizer, 
     DistilBertForSequenceClassification,
-    AdamW,
     get_linear_schedule_with_warmup
 )
 from sklearn.metrics import accuracy_score, classification_report

@@ -9,6 +9,8 @@ import json
 from motor.motor_asyncio import AsyncIOMotorClient
 from datetime import datetime
 from typing import Optional, List
+import torch
+from transformers import DistilBertTokenizer, DistilBertForSequenceClassification
 
 # Load environment variables
 load_dotenv()
@@ -28,6 +30,30 @@ MONGODB_URL = os.getenv("MONGODB_URL")
 client = None
 db = None
 
+# Custom Emotion Model
+EMOTION_MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "ml", "emotion_model")
+EMOTION_LABELS = ['angry', 'anxious', 'happy', 'neutral', 'sad', 'stressed']
+emotion_tokenizer = None
+emotion_model = None
+emotion_device = None
+
+def load_emotion_model():
+    """Load the custom trained emotion classifier."""
+    global emotion_tokenizer, emotion_model, emotion_device
+    try:
+        if os.path.exists(EMOTION_MODEL_PATH):
+            print("🧠 Loading custom emotion model...")
+            emotion_tokenizer = DistilBertTokenizer.from_pretrained(EMOTION_MODEL_PATH)
+            emotion_model = DistilBertForSequenceClassification.from_pretrained(EMOTION_MODEL_PATH)
+            emotion_model.eval()
+            emotion_device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            emotion_model.to(emotion_device)
+            print(f"✅ Custom emotion model loaded on {emotion_device}")
+        else:
+            print(f"⚠️ Emotion model not found at {EMOTION_MODEL_PATH}")
+    except Exception as e:
+        print(f"❌ Failed to load emotion model: {e}")
+
 async def connect_to_mongo():
     global client, db
     if MONGODB_URL:
@@ -44,10 +70,11 @@ async def connect_to_mongo():
 
 app = FastAPI()
 
-# Startup event to connect to MongoDB
+# Startup event to connect to MongoDB and load emotion model
 @app.on_event("startup")
 async def startup_db_client():
     await connect_to_mongo()
+    load_emotion_model()
 
 # Shutdown event to close MongoDB connection
 @app.on_event("shutdown")
@@ -77,9 +104,54 @@ class MoodEntry(BaseModel):
     food_eaten: Optional[str] = None
     notes: Optional[str] = None
 
+class EmotionInput(BaseModel):
+    text: str
+
 @app.get("/")
 def read_root():
-    return {"message": "NutriMate AI Backend is Running", "db_status": "connected" if db else "not connected"}
+    return {
+        "message": "NutriMate AI Backend is Running", 
+        "db_status": "connected" if db else "not connected",
+        "emotion_model": "loaded" if emotion_model else "not loaded"
+    }
+
+@app.post("/analyze_emotion")
+async def analyze_emotion(input_data: EmotionInput):
+    """Analyze emotion using custom trained DistilBERT model."""
+    if not emotion_model or not emotion_tokenizer:
+        raise HTTPException(status_code=503, detail="Emotion model not loaded. Train the model first.")
+    
+    try:
+        # Tokenize input
+        encoding = emotion_tokenizer(
+            input_data.text,
+            truncation=True,
+            padding='max_length',
+            max_length=128,
+            return_tensors='pt'
+        )
+        
+        input_ids = encoding['input_ids'].to(emotion_device)
+        attention_mask = encoding['attention_mask'].to(emotion_device)
+        
+        # Get prediction
+        with torch.no_grad():
+            outputs = emotion_model(input_ids=input_ids, attention_mask=attention_mask)
+            probs = torch.softmax(outputs.logits, dim=1)
+            pred_idx = torch.argmax(probs, dim=1).item()
+            confidence = probs[0][pred_idx].item()
+        
+        # Get all emotion scores
+        all_scores = {label: round(probs[0][i].item(), 3) for i, label in enumerate(EMOTION_LABELS)}
+        
+        return {
+            "emotion": EMOTION_LABELS[pred_idx],
+            "confidence": round(confidence, 3),
+            "all_scores": all_scores,
+            "model": "custom_distilbert"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Emotion analysis failed: {str(e)}")
 
 @app.post("/recommend_diet")
 async def recommend_diet(user_input: UserInput):
