@@ -1,6 +1,6 @@
 # 🧠 Custom Emotion Classifier - Technical Documentation
 
-> **For BE Computer Engineering Final Year Project**
+
 > 
 > This document provides a comprehensive technical explanation of the custom emotion classification model built for NutriMate AI.
 
