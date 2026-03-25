@@ -1,28 +1,37 @@
 """
-Inference script for the trained emotion classifier.
-Use this to test the model after training.
+Inference module for the trained emotion classifier.
+This module is shared: imported by main.py (backend) and usable standalone for testing.
 """
 
 import torch
 from transformers import DistilBertTokenizer, DistilBertForSequenceClassification
 
-# Load model
-MODEL_PATH = 'emotion_model'
 LABELS = ['angry', 'anxious', 'happy', 'neutral', 'sad', 'stressed']
 
-def load_model():
-    """Load the trained model."""
-    tokenizer = DistilBertTokenizer.from_pretrained(MODEL_PATH)
-    model = DistilBertForSequenceClassification.from_pretrained(MODEL_PATH)
+
+def load_model(model_path: str = 'emotion_model'):
+    """Load the trained model from the given directory. Returns (tokenizer, model, device)."""
+    tokenizer = DistilBertTokenizer.from_pretrained(model_path)
+    model = DistilBertForSequenceClassification.from_pretrained(model_path)
     model.eval()
-    
+
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
-    
+
     return tokenizer, model, device
 
-def predict_emotion(text, tokenizer, model, device):
-    """Predict emotion for a given text."""
+
+def predict_emotion(text: str, tokenizer, model, device) -> dict:
+    """
+    Predict emotion for a given text string.
+
+    Returns:
+        {
+            'emotion': str,
+            'confidence': float,
+            'all_scores': {label: float, ...}
+        }
+    """
     encoding = tokenizer(
         text,
         truncation=True,
@@ -30,16 +39,16 @@ def predict_emotion(text, tokenizer, model, device):
         max_length=128,
         return_tensors='pt'
     )
-    
+
     input_ids = encoding['input_ids'].to(device)
     attention_mask = encoding['attention_mask'].to(device)
-    
+
     with torch.no_grad():
         outputs = model(input_ids=input_ids, attention_mask=attention_mask)
         probs = torch.softmax(outputs.logits, dim=1)
         pred_idx = torch.argmax(probs, dim=1).item()
         confidence = probs[0][pred_idx].item()
-    
+
     return {
         'emotion': LABELS[pred_idx],
         'confidence': round(confidence, 3),
@@ -51,8 +60,7 @@ if __name__ == '__main__':
     print("🧠 Loading emotion classifier...")
     tokenizer, model, device = load_model()
     print(f"   Device: {device}")
-    
-    # Test examples
+
     test_texts = [
         "I feel so happy today, everything is going great!",
         "I'm really stressed about my upcoming exam",
@@ -61,7 +69,7 @@ if __name__ == '__main__':
         "I'm worried about the future",
         "Today is just a normal day"
     ]
-    
+
     print("\n📊 Predictions:")
     print("-" * 60)
     for text in test_texts:

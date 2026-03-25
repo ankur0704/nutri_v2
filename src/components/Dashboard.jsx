@@ -3,10 +3,11 @@ import {
     LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     BarChart, Bar, Cell, Legend
 } from 'recharts';
-import { Brain, Activity, TrendingUp, Lightbulb, Download, RefreshCw } from 'lucide-react';
+import { Brain, Activity, TrendingUp, Lightbulb, Download, RefreshCw, AlertCircle } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import MoodLogger from './MoodLogger';
+import API_BASE from '../config';
 
 // Fallback mock data
 const mockMoodData = [
@@ -32,16 +33,16 @@ const Dashboard = () => {
     const [analytics, setAnalytics] = useState(null);
     const [loading, setLoading] = useState(true);
     const [usingMockData, setUsingMockData] = useState(true);
+    const [fetchError, setFetchError] = useState(null);
 
     const fetchHistory = async () => {
-        console.log('fetchHistory called - fetching data...');
         setLoading(true);
+        setFetchError(null);
         try {
-            const response = await fetch('http://localhost:8000/get_history?limit=7');
-            if (!response.ok) throw new Error('Failed to fetch');
+            const response = await fetch(`${API_BASE}/get_history?limit=7`);
+            if (!response.ok) throw new Error(`Server returned ${response.status}`);
 
             const data = await response.json();
-            console.log('Fetched history data:', data);
 
             if (data.entries && data.entries.length > 0) {
                 const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -54,7 +55,6 @@ const Dashboard = () => {
                         energy: entry.energy_level
                     };
                 });
-                console.log('Chart data updated:', chartData);
                 setMoodData(chartData);
                 setUsingMockData(false);
             } else {
@@ -65,13 +65,13 @@ const Dashboard = () => {
             console.error('Failed to fetch history:', err);
             setMoodData(mockMoodData);
             setUsingMockData(true);
+            setFetchError('Could not reach the backend. Showing demo data.');
         }
 
         try {
-            const analyticsResponse = await fetch('http://localhost:8000/analytics');
+            const analyticsResponse = await fetch(`${API_BASE}/analytics`);
             if (analyticsResponse.ok) {
                 const analyticsData = await analyticsResponse.json();
-                console.log('Analytics data updated:', analyticsData);
                 setAnalytics(analyticsData);
             }
         } catch (analyticsErr) {
@@ -159,6 +159,14 @@ const Dashboard = () => {
 
     return (
         <div className="animate-fadeIn">
+            {/* Error banner */}
+            {fetchError && (
+                <div className="flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 mb-4">
+                    <AlertCircle size={18} className="shrink-0" />
+                    <span>{fetchError} Make sure the backend is running on port 8000.</span>
+                </div>
+            )}
+
             {/* Header Row */}
             <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
                 <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-3">

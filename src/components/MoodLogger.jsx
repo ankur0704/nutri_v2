@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Smile, Zap, Brain, Utensils, Save, CheckCircle } from 'lucide-react';
+import API_BASE from '../config';
 
 const MoodLogger = ({ onEntryLogged }) => {
     const [formData, setFormData] = useState({
@@ -9,6 +10,7 @@ const MoodLogger = ({ onEntryLogged }) => {
         food_eaten: '',
         notes: ''
     });
+
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
     const [error, setError] = useState(null);
@@ -20,11 +22,12 @@ const MoodLogger = ({ onEntryLogged }) => {
         setSuccess(false);
 
         try {
-            const response = await fetch('http://localhost:8000/log_entry', {
+            const response = await fetch(`${API_BASE}/log_entry`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(formData)
             });
+
 
             if (!response.ok) {
                 const errData = await response.json();
@@ -66,8 +69,8 @@ const MoodLogger = ({ onEntryLogged }) => {
                         key={score}
                         type="button"
                         className={`w-10 h-10 rounded-lg font-semibold transition-all duration-200 ${value === score
-                                ? `${bgColor} text-white shadow-md scale-105`
-                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            ? `${bgColor} text-white shadow-md scale-105`
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                             }`}
                         onClick={() => onChange(score)}
                     >

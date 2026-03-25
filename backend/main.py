@@ -1,219 +1,243 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, HTTPException, Request
+from pydantic import BaseModel, Field
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import os
+import logging
 import google.generativeai as genai
 from dotenv import load_dotenv
 import json
 from motor.motor_asyncio import AsyncIOMotorClient
-from datetime import datetime
-from typing import Optional, List
+from datetime import datetime, timezone
+from typing import Optional
 import torch
 from transformers import DistilBertTokenizer, DistilBertForSequenceClassification
 
-# Load environment variables
+# ─── Logging setup ────────────────────────────────────────────────────────────
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+logger = logging.getLogger("nutrimate")
+
+# ─── Load environment variables ───────────────────────────────────────────────
 load_dotenv()
 
-# Configure Gemini
+# ─── Gemini configuration ─────────────────────────────────────────────────────
 GENAI_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GENAI_API_KEY:
-    print("Warning: GEMINI_API_KEY not found in .env file")
+    logger.warning("GEMINI_API_KEY not found in .env file")
 
 genai.configure(api_key=GENAI_API_KEY)
+gemini_model = genai.GenerativeModel(
+    "gemini-2.5-flash",
+    generation_config={"response_mime_type": "application/json"},
+)
 
-# Use the standard model
-model = genai.GenerativeModel('gemini-2.5-flash')
-
-# MongoDB Connection
+# ─── MongoDB ──────────────────────────────────────────────────────────────────
 MONGODB_URL = os.getenv("MONGODB_URL")
-client = None
-db = None
 
-# Custom Emotion Model
+# ─── Custom Emotion Model ─────────────────────────────────────────────────────
 EMOTION_MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "ml", "emotion_model")
-EMOTION_LABELS = ['angry', 'anxious', 'happy', 'neutral', 'sad', 'stressed']
-emotion_tokenizer = None
-emotion_model = None
-emotion_device = None
+EMOTION_LABELS = ["angry", "anxious", "happy", "neutral", "sad", "stressed"]
 
-def load_emotion_model():
-    """Load the custom trained emotion classifier."""
-    global emotion_tokenizer, emotion_model, emotion_device
+
+def _load_emotion_model():
+    """Load the custom trained emotion classifier. Returns (tokenizer, model, device) or (None, None, None)."""
     try:
         if os.path.exists(EMOTION_MODEL_PATH):
-            print("🧠 Loading custom emotion model...")
-            emotion_tokenizer = DistilBertTokenizer.from_pretrained(EMOTION_MODEL_PATH)
-            emotion_model = DistilBertForSequenceClassification.from_pretrained(EMOTION_MODEL_PATH)
-            emotion_model.eval()
-            emotion_device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-            emotion_model.to(emotion_device)
-            print(f"✅ Custom emotion model loaded on {emotion_device}")
+            logger.info("Loading custom emotion model...")
+            tokenizer = DistilBertTokenizer.from_pretrained(EMOTION_MODEL_PATH)
+            model = DistilBertForSequenceClassification.from_pretrained(EMOTION_MODEL_PATH)
+            model.eval()
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            model.to(device)
+            logger.info("Custom emotion model loaded on %s", device)
+            return tokenizer, model, device
         else:
-            print(f"⚠️ Emotion model not found at {EMOTION_MODEL_PATH}")
-    except Exception as e:
-        print(f"❌ Failed to load emotion model: {e}")
+            logger.warning("Emotion model not found at %s", EMOTION_MODEL_PATH)
+    except Exception as exc:
+        logger.error("Failed to load emotion model: %s", exc)
+    return None, None, None
 
-async def connect_to_mongo():
-    global client, db
-    if MONGODB_URL:
-        try:
-            client = AsyncIOMotorClient(MONGODB_URL)
-            db = client.nutrimate
-            # Test the connection
-            await client.admin.command('ping')
-            print("✅ Connected to MongoDB Atlas!")
-        except Exception as e:
-            print(f"❌ MongoDB connection failed: {e}")
-    else:
-        print("⚠️ MONGODB_URL not found in .env")
 
-app = FastAPI()
+async def _connect_to_mongo():
+    """Connect to MongoDB and return client + db, or (None, None) on failure."""
+    if not MONGODB_URL:
+        logger.warning("MONGODB_URL not found in .env")
+        return None, None
+    try:
+        client = AsyncIOMotorClient(MONGODB_URL)
+        await client.admin.command("ping")
+        logger.info("Connected to MongoDB Atlas!")
+        return client, client.nutrimate
+    except Exception as exc:
+        logger.error("MongoDB connection failed: %s", exc)
+        return None, None
 
-# Startup event to connect to MongoDB and load emotion model
-@app.on_event("startup")
-async def startup_db_client():
-    await connect_to_mongo()
-    load_emotion_model()
 
-# Shutdown event to close MongoDB connection
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    global client
-    if client:
-        client.close()
+# ─── Lifespan ─────────────────────────────────────────────────────────────────
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    mongo_client, db = await _connect_to_mongo()
+    tokenizer, emotion_model, emotion_device = _load_emotion_model()
+    app.state.mongo_client = mongo_client
+    app.state.db = db
+    app.state.emotion_tokenizer = tokenizer
+    app.state.emotion_model = emotion_model
+    app.state.emotion_device = emotion_device
+    yield
+    # Shutdown
+    if app.state.mongo_client:
+        app.state.mongo_client.close()
 
-# Allow CORS for frontend
+
+# ─── App ──────────────────────────────────────────────────────────────────────
+app = FastAPI(lifespan=lifespan)
+
+# CORS – restrict to known origins; expand for production
+ALLOWED_ORIGINS = os.getenv(
+    "ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
+).split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+
+# ─── Pydantic models ──────────────────────────────────────────────────────────
 class UserInput(BaseModel):
-    text: str
-    age: int
-    goal: str
+    text: str = Field(..., min_length=2, max_length=2000)
+    age: int = Field(..., ge=1, le=120)
+    goal: str = Field(..., pattern="^(Maintain Weight|Weight Loss|Weight Gain)$")
+
 
 class MoodEntry(BaseModel):
-    mood_score: int  # 1-5
-    energy_level: int  # 1-5
-    focus_level: int  # 1-5
-    food_eaten: Optional[str] = None
-    notes: Optional[str] = None
+    mood_score: int = Field(..., ge=1, le=5)
+    energy_level: int = Field(..., ge=1, le=5)
+    focus_level: int = Field(..., ge=1, le=5)
+    food_eaten: Optional[str] = Field(None, max_length=500)
+    notes: Optional[str] = Field(None, max_length=500)
+
 
 class EmotionInput(BaseModel):
-    text: str
+    text: str = Field(..., min_length=2, max_length=2000)
 
-@app.get("/")
-def read_root():
+
+# ─── Helpers ──────────────────────────────────────────────────────────────────
+def _predict_emotion(text: str, tokenizer, model, device) -> dict:
+    """Run inference with the custom emotion model."""
+    encoding = tokenizer(
+        text,
+        truncation=True,
+        padding="max_length",
+        max_length=128,
+        return_tensors="pt",
+    )
+    input_ids = encoding["input_ids"].to(device)
+    attention_mask = encoding["attention_mask"].to(device)
+
+    with torch.no_grad():
+        outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+        probs = torch.softmax(outputs.logits, dim=1)
+        pred_idx = torch.argmax(probs, dim=1).item()
+        confidence = probs[0][pred_idx].item()
+
+    all_scores = {
+        label: round(probs[0][i].item(), 3)
+        for i, label in enumerate(EMOTION_LABELS)
+    }
     return {
-        "message": "NutriMate AI Backend is Running", 
-        "db_status": "connected" if db else "not connected",
-        "emotion_model": "loaded" if emotion_model else "not loaded"
+        "emotion": EMOTION_LABELS[pred_idx],
+        "confidence": round(confidence, 3),
+        "all_scores": all_scores,
+        "model": "custom_distilbert",
     }
 
+
+# ─── Routes ───────────────────────────────────────────────────────────────────
+@app.get("/")
+def read_root(request: Request):
+    return {
+        "message": "NutriMate AI Backend is Running",
+        "db_status": "connected" if request.app.state.db is not None else "not connected",
+        "emotion_model": "loaded" if request.app.state.emotion_model is not None else "not loaded",
+    }
+
+
 @app.post("/analyze_emotion")
-async def analyze_emotion(input_data: EmotionInput):
+async def analyze_emotion(input_data: EmotionInput, request: Request):
     """Analyze emotion using custom trained DistilBERT model."""
-    if not emotion_model or not emotion_tokenizer:
-        raise HTTPException(status_code=503, detail="Emotion model not loaded. Train the model first.")
-    
-    try:
-        # Tokenize input
-        encoding = emotion_tokenizer(
-            input_data.text,
-            truncation=True,
-            padding='max_length',
-            max_length=128,
-            return_tensors='pt'
+    tokenizer = request.app.state.emotion_tokenizer
+    model = request.app.state.emotion_model
+    device = request.app.state.emotion_device
+
+    if not model or not tokenizer:
+        raise HTTPException(
+            status_code=503,
+            detail="Emotion model not loaded. Train the model first.",
         )
-        
-        input_ids = encoding['input_ids'].to(emotion_device)
-        attention_mask = encoding['attention_mask'].to(emotion_device)
-        
-        # Get prediction
-        with torch.no_grad():
-            outputs = emotion_model(input_ids=input_ids, attention_mask=attention_mask)
-            probs = torch.softmax(outputs.logits, dim=1)
-            pred_idx = torch.argmax(probs, dim=1).item()
-            confidence = probs[0][pred_idx].item()
-        
-        # Get all emotion scores
-        all_scores = {label: round(probs[0][i].item(), 3) for i, label in enumerate(EMOTION_LABELS)}
-        
-        return {
-            "emotion": EMOTION_LABELS[pred_idx],
-            "confidence": round(confidence, 3),
-            "all_scores": all_scores,
-            "model": "custom_distilbert"
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Emotion analysis failed: {str(e)}")
+    try:
+        return _predict_emotion(input_data.text, tokenizer, model, device)
+    except Exception as exc:
+        logger.exception("Emotion analysis failed")
+        raise HTTPException(status_code=500, detail=f"Emotion analysis failed: {exc}")
+
 
 @app.post("/recommend_diet")
 async def recommend_diet(user_input: UserInput):
+    prompt = f"""
+    Act as a professional nutritionist and empathetic AI advisor.
+
+    User Profile:
+    - Age: {user_input.age}
+    - Goal: {user_input.goal}
+    - Current State/Feeling: "{user_input.text}"
+
+    Task:
+    1. Analyze the user's emotion based on their input text.
+    2. Create a one-day diet plan (Breakfast, Lunch, Dinner) specifically tailored to their emotion and goal.
+       (e.g., if stressed, suggest calming foods like magnesium-rich items).
+    3. Write a short, encouraging note explaining why you picked these foods.
+
+    Return a JSON object with this exact structure:
+    {{
+        "emotion": "Detected Emotion",
+        "diet_plan": {{
+            "breakfast": "Meal details",
+            "lunch": "Meal details",
+            "dinner": "Meal details"
+        }},
+        "notes": "Explanation and motivation"
+    }}
+    """
     try:
-        # Construct the prompt
-        prompt = f"""
-        Act as a professional nutritionist and empathetic AI advisor.
-        
-        User Profile:
-        - Age: {user_input.age}
-        - Goal: {user_input.goal}
-        - Current State/Feeling: "{user_input.text}"
-
-        Task:
-        1. Analyze the user's emotion based on their input text.
-        2. Create a one-day diet plan (Breakfast, Lunch, Dinner) specifically tailored to their emotion and goal. 
-           (e.g., if stressed, suggest calming foods like magnesium-rich items).
-        3. Write a short, encouraging note explaining why you picked these foods.
-
-        Output Format:
-        Return ONLY valid JSON with this exact structure (no markdown, no backticks):
-        {{
-            "emotion": "Detected Emotion",
-            "diet_plan": {{
-                "breakfast": "Meal details",
-                "lunch": "Meal details",
-                "dinner": "Meal details"
-            }},
-            "notes": "Explanation and motivation"
-        }}
-        """
-
-        # Generate content
-        response = model.generate_content(prompt)
-        
-        # Clean up response to ensure it's valid JSON
-        response_text = response.text
-        if response_text.startswith("```json"):
-            response_text = response_text[7:]
-        if response_text.startswith("```"):
-            response_text = response_text[3:]
-        if response_text.endswith("```"):
-            response_text = response_text[:-3]
-
-        result = json.loads(response_text)
+        response = gemini_model.generate_content(prompt)
+        result = json.loads(response.text)
         return result
+    except json.JSONDecodeError as exc:
+        logger.error("Gemini returned invalid JSON: %s | Raw: %s", exc, response.text[:200])
+        raise HTTPException(
+            status_code=502,
+            detail="AI returned an unexpected response format. Please try again.",
+        )
+    except Exception as exc:
+        logger.exception("Diet recommendation failed")
+        raise HTTPException(status_code=500, detail=f"Server Error: {exc}")
 
-    except Exception as e:
-        import traceback
-        print("Detailed Error Traceback:")
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Server Error: {str(e)}")
 
 @app.post("/log_entry")
-async def log_entry(entry: MoodEntry):
-    """Log a mood/wellness entry to the database"""
-    print(f"DEBUG: Received entry: {entry}")
-    print(f"DEBUG: db object: {db}")
-    
+async def log_entry(entry: MoodEntry, request: Request):
+    """Log a mood/wellness entry to the database."""
+    db = request.app.state.db
     if db is None:
         raise HTTPException(status_code=503, detail="Database not connected")
-    
     try:
         document = {
             "mood_score": entry.mood_score,
@@ -221,31 +245,27 @@ async def log_entry(entry: MoodEntry):
             "focus_level": entry.focus_level,
             "food_eaten": entry.food_eaten,
             "notes": entry.notes,
-            "timestamp": datetime.utcnow()
+            "timestamp": datetime.now(timezone.utc),
         }
-        print(f"DEBUG: Inserting document: {document}")
         result = await db.mood_entries.insert_one(document)
-        print(f"DEBUG: Insert successful, id: {result.inserted_id}")
+        logger.info("Logged mood entry id=%s", result.inserted_id)
         return {"message": "Entry logged successfully", "id": str(result.inserted_id)}
-    except Exception as e:
-        import traceback
-        print("ERROR in log_entry:")
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Failed to log entry: {str(e)}")
+    except Exception as exc:
+        logger.exception("Failed to log entry")
+        raise HTTPException(status_code=500, detail=f"Failed to log entry: {exc}")
+
 
 @app.get("/get_history")
-async def get_history(limit: int = 7):
-    """Get recent mood/wellness history"""
-    print(f"DEBUG get_history: db = {db}")
-    
+async def get_history(request: Request, limit: int = 7):
+    """Get recent mood/wellness history."""
+    db = request.app.state.db
     if db is None:
         raise HTTPException(status_code=503, detail="Database not connected")
-    
     try:
         cursor = db.mood_entries.find().sort("timestamp", -1).limit(limit)
         entries = []
         async for doc in cursor:
-            timestamp_val = doc.get("timestamp")
+            ts = doc.get("timestamp")
             entries.append({
                 "id": str(doc["_id"]),
                 "mood_score": doc.get("mood_score"),
@@ -253,61 +273,48 @@ async def get_history(limit: int = 7):
                 "focus_level": doc.get("focus_level"),
                 "food_eaten": doc.get("food_eaten"),
                 "notes": doc.get("notes"),
-                "timestamp": timestamp_val.isoformat() if timestamp_val else None
+                "timestamp": ts.isoformat() if ts else None,
             })
-        print(f"DEBUG get_history: returning {len(entries)} entries")
+        logger.info("Returning %d history entries", len(entries))
         return {"entries": entries, "count": len(entries)}
-    except Exception as e:
-        import traceback
-        print("ERROR in get_history:")
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Failed to fetch history: {str(e)}")
+    except Exception as exc:
+        logger.exception("Failed to fetch history")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch history: {exc}")
+
 
 @app.get("/analytics")
-async def get_analytics():
-    """Get aggregated analytics for the dashboard"""
-    print(f"DEBUG analytics: db = {db}")
-    
+async def get_analytics(request: Request):
+    """Get aggregated analytics for the dashboard."""
+    db = request.app.state.db
     if db is None:
         raise HTTPException(status_code=503, detail="Database not connected")
-    
     try:
-        # Get last 30 entries
         cursor = db.mood_entries.find().sort("timestamp", -1).limit(30)
-        entries = []
-        async for doc in cursor:
-            entries.append(doc)
-        
-        print(f"DEBUG analytics: found {len(entries)} entries")
-        
+        entries = [doc async for doc in cursor]
+
         if not entries:
             return {"message": "No data available", "has_data": False}
-        
-        # Calculate averages safely
-        mood_scores = [e.get("mood_score", 0) or 0 for e in entries]
-        energy_levels = [e.get("energy_level", 0) or 0 for e in entries]
-        focus_levels = [e.get("focus_level", 0) or 0 for e in entries]
-        
-        avg_mood = sum(mood_scores) / len(entries)
-        avg_energy = sum(energy_levels) / len(entries)
-        avg_focus = sum(focus_levels) / len(entries)
-        
+
+        mood_scores = [e.get("mood_score") or 0 for e in entries]
+        energy_levels = [e.get("energy_level") or 0 for e in entries]
+        focus_levels = [e.get("focus_level") or 0 for e in entries]
+        n = len(entries)
+
         result = {
             "has_data": True,
-            "total_entries": len(entries),
+            "total_entries": n,
             "averages": {
-                "mood": round(avg_mood, 1),
-                "energy": round(avg_energy, 1),
-                "focus": round(avg_focus, 1)
-            }
+                "mood": round(sum(mood_scores) / n, 1),
+                "energy": round(sum(energy_levels) / n, 1),
+                "focus": round(sum(focus_levels) / n, 1),
+            },
         }
-        print(f"DEBUG analytics: returning {result}")
+        logger.info("Analytics result: %s", result)
         return result
-    except Exception as e:
-        import traceback
-        print("ERROR in analytics:")
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Failed to get analytics: {str(e)}")
+    except Exception as exc:
+        logger.exception("Failed to get analytics")
+        raise HTTPException(status_code=500, detail=f"Failed to get analytics: {exc}")
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
